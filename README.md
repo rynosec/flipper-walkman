@@ -2,10 +2,6 @@
 
 A retro Walkman-style UART MP3 controller for Flipper Zero.
 
-Created by Rohit Yadav (`rynosec`)
-Website: https://ryno.sh
-GitHub: https://github.com/rynosec
-
 ![Flipper Walkman UI 1](assets/screenshots/walkman-ui-1.png)
 ![Flipper Walkman UI 2](assets/screenshots/walkman-ui-2.png)
 ![Flipper Walkman UI 3](assets/screenshots/walkman-ui-3.png)
@@ -71,7 +67,7 @@ flipper_walkman/
 ## Hardware required
 
 - Flipper Zero
-- UART MP3 Player module (GD3300D / HW-311 / YX5300 style)
+- UART MP3 Player module (GD3300D / HW-311 / YX5300 style) - https://www.aliexpress.com/item/1005005833966814.html
 - microSD card for the MP3 module
 - 3.5mm headphones or amplified speaker connected to the module
 - Jumper wires
@@ -237,13 +233,13 @@ Main UI:
 - Add track number display polish
 - Add optional playlist mapping file on Flipper SD card to map track numbers to song names
 - Improve module compatibility notes for GD3300D / HW-311 / YX5300 variants
+- 3D printed case, custom board design for easy plug and play
 - Add better transport/status indicators
 - Explore richer progress / elapsed-time behavior
 - Investigate friendlier packaging for Flipper Apps Catalog submission
 
 ## Credits
 
-- Rohit Yadav / `rynosec`
 - Flipper Zero developer documentation: https://developer.flipper.net/flipperzero/doxygen/applications.html
 - uFBT tooling
 - The many low-cost UART MP3 modules that make weird fun hardware projects possible
