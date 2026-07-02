@@ -16,7 +16,7 @@ This is not playing MP3 files from the Flipper itself. The Flipper acts as the c
 
 This project started from a pretty simple and nostalgic idea: I wanted to see if I could turn the Flipper Zero into something that felt like a tiny old-school Walkman.
 
-Not just a generic hardware remote, but something with its own little personality: physical controls, a cassette-style UI, and the feeling of operating a dedicated music gadget.
+Not just a generic hardware remote, but something with its own little personality: physical controls, a cassette-style UI. 
 
 Before I landed on the final setup, I thought through a few different hardware routes:
 
@@ -39,12 +39,9 @@ The breakthrough was stumbling onto the ready-to-go HW-311 style module built ar
 ## Features
 
 - Native Flipper Zero `.fap` app written in C
-- Built with uFBT
 - Retro cassette / Walkman-inspired UI
 - UART control for low-cost MP3 modules
 - Playback control from Flipper buttons
-- Volume control from Flipper buttons
-- About / Help screen
 - Tested with a GD3300D / HW-311 style UART MP3 module
 
 ## Repository layout
@@ -136,7 +133,7 @@ Prerequisites:
 Build steps:
 
 ```bash
-cd /home/ryno/Tools/CustomTools/flipper_walkman
+cd /flipper_walkman
 ufbt faps
 ```
 
@@ -236,7 +233,6 @@ Main UI:
 - 3D printed case, custom board design for easy plug and play
 - Add better transport/status indicators
 - Explore richer progress / elapsed-time behavior
-- Investigate friendlier packaging for Flipper Apps Catalog submission
 
 ## Credits
 
