@@ -103,6 +103,24 @@ static void draw_seek_bar(Canvas* canvas, uint8_t progress) {
     }
 }
 
+static void draw_visualizer(Canvas* canvas, uint8_t x, uint8_t y, uint8_t frame, bool invert) {
+    static const uint8_t patterns[4][4] = {
+        {2, 5, 3, 6},
+        {6, 3, 5, 2},
+        {3, 6, 2, 5},
+        {5, 2, 6, 3},
+    };
+
+    const uint8_t* bars = patterns[frame % 4];
+
+    for(uint8_t i = 0; i < 4; i++) {
+        uint8_t height = bars[invert ? (3 - i) : i];
+        uint8_t bar_x = x + (i * 3);
+        uint8_t top_y = y - height;
+        canvas_draw_box(canvas, bar_x, top_y, 2, height);
+    }
+}
+
 static void draw_reel(Canvas* canvas, uint8_t x, uint8_t y, uint8_t frame) {
     canvas_draw_circle(canvas, x, y, 7);
     canvas_draw_disc(canvas, x, y, 2);
@@ -152,10 +170,8 @@ static void draw_player(Canvas* canvas, WalkmanApp* app) {
     draw_cassette(canvas, app);
 
     draw_seek_bar(canvas, app->progress);
-
-    canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str(canvas, 4, 51, "0:00");
-    canvas_draw_str(canvas, 106, 51, "3:45");
+    draw_visualizer(canvas, 4, 51, app->reel_frame, false);
+    draw_visualizer(canvas, 110, 51, app->reel_frame, true);
 
     draw_volume_bar(canvas, app->volume);
     draw_transport_buttons(canvas, app->playing);
