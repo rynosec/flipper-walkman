@@ -14,6 +14,7 @@ typedef enum {
     ScreenSplash,
     ScreenPlayer,
     ScreenAbout,
+    ScreenNoModule,
 } WalkmanScreen;
 
 typedef struct {
@@ -25,9 +26,12 @@ typedef struct {
     FuriMessageQueue* queue;
     ViewPort* view_port;
     FuriTimer* timer;
+    FuriHalSerialHandle* serial;
 
     WalkmanScreen screen;
     bool playing;
+    bool module_attached;
+    volatile uint8_t probe_rx_count;
     uint8_t volume;
     uint8_t reel_frame;
     uint8_t progress;
@@ -72,6 +76,59 @@ static void cmd_next(FuriHalSerialHandle* serial) {
 static void cmd_prev(FuriHalSerialHandle* serial) {
     const uint8_t cmd[] = {0x7E, 0xFF, 0x06, 0x02, 0x00, 0x00, 0x00, 0xEF};
     uart_send(serial, cmd, sizeof(cmd));
+}
+
+static uint16_t yx_checksum(uint8_t cmd, uint8_t feedback, uint8_t param_hi, uint8_t param_lo) {
+    uint16_t sum = 0xFF + 0x06 + cmd + feedback + param_hi + param_lo;
+    return (uint16_t)(0 - sum);
+}
+
+static void serial_probe_rx_callback(
+    FuriHalSerialHandle* handle,
+    FuriHalSerialRxEvent event,
+    void* context) {
+    WalkmanApp* app = context;
+
+    if(event & FuriHalSerialRxEventData) {
+        while(furi_hal_serial_async_rx_available(handle)) {
+            (void)furi_hal_serial_async_rx(handle);
+            if(app->probe_rx_count < UINT8_MAX) {
+                app->probe_rx_count++;
+            }
+        }
+    }
+}
+
+static bool detect_mp3_module(WalkmanApp* app) {
+    app->probe_rx_count = 0;
+
+    furi_hal_serial_async_rx_start(app->serial, serial_probe_rx_callback, app, false);
+
+    const uint8_t cmd = 0x42;
+    const uint8_t feedback = 0x01;
+    const uint8_t param_hi = 0x00;
+    const uint8_t param_lo = 0x00;
+    const uint16_t checksum = yx_checksum(cmd, feedback, param_hi, param_lo);
+    const uint8_t frame[] = {
+        0x7E,
+        0xFF,
+        0x06,
+        cmd,
+        feedback,
+        param_hi,
+        param_lo,
+        (uint8_t)(checksum >> 8),
+        (uint8_t)(checksum & 0xFF),
+        0xEF,
+    };
+
+    furi_hal_serial_tx(app->serial, frame, sizeof(frame));
+    furi_hal_serial_tx_wait_complete(app->serial);
+    furi_delay_ms(150);
+
+    furi_hal_serial_async_rx_stop(app->serial);
+
+    return app->probe_rx_count > 0;
 }
 
 static void draw_header(Canvas* canvas, const char* title) {
@@ -177,6 +234,17 @@ static void draw_player(Canvas* canvas, WalkmanApp* app) {
     draw_transport_buttons(canvas, app->playing);
 }
 
+static void draw_no_module(Canvas* canvas) {
+    canvas_clear(canvas);
+    draw_header(canvas, "MP3 MODULE NEEDED");
+
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str_aligned(canvas, 64, 24, AlignCenter, AlignBottom, "Attach UART MP3 module");
+    canvas_draw_str_aligned(canvas, 64, 34, AlignCenter, AlignBottom, "TX/RX/GND/VCC first");
+    canvas_draw_str_aligned(canvas, 64, 46, AlignCenter, AlignBottom, "Press OK to retry");
+    canvas_draw_str_aligned(canvas, 64, 58, AlignCenter, AlignBottom, "Long Back to exit");
+}
+
 static void draw_about(Canvas* canvas) {
     canvas_clear(canvas);
     draw_header(canvas, "ABOUT / HELP");
@@ -210,6 +278,8 @@ static void draw_callback(Canvas* canvas, void* ctx) {
         draw_player(canvas, app);
     } else if(app->screen == ScreenAbout) {
         draw_about(canvas);
+    } else if(app->screen == ScreenNoModule) {
+        draw_no_module(canvas);
     }
 }
 
@@ -234,11 +304,14 @@ int32_t flipper_walkman_app(void* p) {
     WalkmanApp* app = malloc(sizeof(WalkmanApp));
     app->queue = furi_message_queue_alloc(8, sizeof(WalkmanEvent));
     app->screen = ScreenSplash;
-    app->playing = true;
+    app->playing = false;
+    app->module_attached = false;
+    app->probe_rx_count = 0;
     app->volume = 20;
     app->reel_frame = 0;
     app->progress = 0;
     app->splash_ticks = 0;
+    app->serial = NULL;
 
     Gui* gui = furi_record_open(RECORD_GUI);
     app->view_port = view_port_alloc();
@@ -250,13 +323,17 @@ int32_t flipper_walkman_app(void* p) {
     app->timer = furi_timer_alloc(timer_callback, FuriTimerTypePeriodic, app);
     furi_timer_start(app->timer, furi_kernel_get_tick_frequency() / 4);
 
-    FuriHalSerialHandle* serial = furi_hal_serial_control_acquire(FuriHalSerialIdUsart);
-    furi_hal_serial_init(serial, 9600);
-    furi_hal_serial_enable_direction(serial, FuriHalSerialDirectionTx);
-    furi_hal_serial_enable_direction(serial, FuriHalSerialDirectionRx);
+    app->serial = furi_hal_serial_control_acquire(FuriHalSerialIdUsart);
+    furi_hal_serial_init(app->serial, 9600);
+    furi_hal_serial_enable_direction(app->serial, FuriHalSerialDirectionTx);
+    furi_hal_serial_enable_direction(app->serial, FuriHalSerialDirectionRx);
 
-    cmd_set_volume(serial, app->volume);
-    cmd_play_first(serial);
+    app->module_attached = detect_mp3_module(app);
+    if(app->module_attached) {
+        cmd_set_volume(app->serial, app->volume);
+        cmd_play_first(app->serial);
+        app->playing = true;
+    }
 
     bool running = true;
 
@@ -271,7 +348,7 @@ int32_t flipper_walkman_app(void* p) {
             if(app->screen == ScreenSplash) {
                 app->splash_ticks++;
                 if(app->splash_ticks >= 4) {
-                    app->screen = ScreenPlayer;
+                    app->screen = app->module_attached ? ScreenPlayer : ScreenNoModule;
                 }
             }
 
@@ -295,8 +372,23 @@ int32_t flipper_walkman_app(void* p) {
             }
 
             if(app->screen == ScreenSplash) {
-                app->screen = ScreenPlayer;
+                app->screen = app->module_attached ? ScreenPlayer : ScreenNoModule;
                 redraw(app);
+                continue;
+            }
+
+            if(app->screen == ScreenNoModule) {
+                if(type == InputTypeShort && key == InputKeyOk) {
+                    app->module_attached = detect_mp3_module(app);
+                    if(app->module_attached) {
+                        cmd_set_volume(app->serial, app->volume);
+                        cmd_play_first(app->serial);
+                        app->playing = true;
+                        app->progress = 0;
+                        app->screen = ScreenPlayer;
+                    }
+                    redraw(app);
+                }
                 continue;
             }
 
@@ -317,28 +409,28 @@ int32_t flipper_walkman_app(void* p) {
             if(type == InputTypeShort) {
                 if(key == InputKeyOk) {
                     if(app->playing) {
-                        cmd_pause(serial);
+                        cmd_pause(app->serial);
                         app->playing = false;
                     } else {
-                        cmd_resume(serial);
+                        cmd_resume(app->serial);
                         app->playing = true;
                     }
                 } else if(key == InputKeyRight) {
-                    cmd_next(serial);
+                    cmd_next(app->serial);
                     app->progress = 0;
                     app->playing = true;
                 } else if(key == InputKeyLeft) {
-                    cmd_prev(serial);
+                    cmd_prev(app->serial);
                     app->progress = 0;
                     app->playing = true;
                 } else if(key == InputKeyUp) {
                     if(app->volume < 30) app->volume++;
-                    cmd_set_volume(serial, app->volume);
+                    cmd_set_volume(app->serial, app->volume);
                 } else if(key == InputKeyDown) {
                     if(app->volume > 0) app->volume--;
-                    cmd_set_volume(serial, app->volume);
+                    cmd_set_volume(app->serial, app->volume);
                 } else if(key == InputKeyBack) {
-                    cmd_pause(serial);
+                    cmd_pause(app->serial);
                     app->playing = false;
                 }
 
@@ -347,15 +439,17 @@ int32_t flipper_walkman_app(void* p) {
         }
     }
 
-    cmd_pause(serial);
+    if(app->module_attached) {
+        cmd_pause(app->serial);
+    }
 
     furi_timer_stop(app->timer);
     furi_timer_free(app->timer);
 
-    furi_hal_serial_disable_direction(serial, FuriHalSerialDirectionTx);
-    furi_hal_serial_disable_direction(serial, FuriHalSerialDirectionRx);
-    furi_hal_serial_deinit(serial);
-    furi_hal_serial_control_release(serial);
+    furi_hal_serial_disable_direction(app->serial, FuriHalSerialDirectionTx);
+    furi_hal_serial_disable_direction(app->serial, FuriHalSerialDirectionRx);
+    furi_hal_serial_deinit(app->serial);
+    furi_hal_serial_control_release(app->serial);
 
     gui_remove_view_port(gui, app->view_port);
     view_port_free(app->view_port);
