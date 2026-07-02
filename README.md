@@ -2,9 +2,12 @@
 
 A retro Walkman-style UART MP3 controller for Flipper Zero.
 
+![Flipper Walkman Project Photo](assets/screenshots/flipperMP3_1.jpeg)
+
 ![Flipper Walkman UI 1](assets/screenshots/walkman-ui-1.png)
 ![Flipper Walkman UI 2](assets/screenshots/walkman-ui-2.png)
 ![Flipper Walkman UI 3](assets/screenshots/walkman-ui-3.png)
+![Flipper Walkman Warning Screen](assets/screenshots/walkman-ui-4.png)
 
 ## What this is
 
@@ -58,7 +61,8 @@ flipper_walkman/
         ├── uart-flipper-sketch.png
         ├── walkman-ui-1.png
         ├── walkman-ui-2.png
-        └── walkman-ui-3.png
+        ├── walkman-ui-3.png
+        └── walkman-ui-4.png
 ```
 
 ## Hardware required
@@ -192,6 +196,10 @@ Main UI:
 ![Flipper Walkman UI 1](assets/screenshots/walkman-ui-1.png)
 ![Flipper Walkman UI 2](assets/screenshots/walkman-ui-2.png)
 ![Flipper Walkman UI 3](assets/screenshots/walkman-ui-3.png)
+
+Warning / module not attached screen:
+
+![Flipper Walkman Warning Screen](assets/screenshots/walkman-ui-4.png)
 
 ## Troubleshooting
 
